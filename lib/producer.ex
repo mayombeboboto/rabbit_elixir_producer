@@ -19,8 +19,13 @@ defmodule Producer do
 
   @spec publish_msg(%{}) :: no_return()
   def publish_msg(msg) do
+    publish_msg(@routing_key, msg)
+  end
+
+  @spec publish_msg(binary(), %{}) :: no_return()
+  def publish_msg(routing_key, msg) do
     {:ok, encoded_msg} = JSON.encode(msg)
-    GenServer.cast(__MODULE__, {:publish, encoded_msg})
+    GenServer.cast(__MODULE__, {:publish, routing_key, encoded_msg})
   end
 
   @impl GenServer
@@ -31,9 +36,9 @@ defmodule Producer do
   end
 
   @impl GenServer
-  def handle_cast({:publish, msg}, %{ conn: conn, chan: chan }) do
+  def handle_cast({:publish, routing_key, msg}, %{ conn: conn, chan: chan }) do
     options = get_publish_options()
-    AMQP.Basic.publish(chan, @exchange, @routing_key, msg, options)
+    AMQP.Basic.publish(chan, @exchange, routing_key, msg, options)
     {:noreply, %{ conn: conn, chan: chan }}
   end
 
@@ -41,12 +46,19 @@ defmodule Producer do
   def handle_info(:init, _state) do
     {:ok, conn} = AMQP.Connection.open()
     {:ok, chan} = AMQP.Channel.open(conn)
+    AMQP.Basic.return(chan, self())
 
     AMQP.Queue.declare(chan, @queue)
     AMQP.Exchange.declare(chan, @exchange)
     AMQP.Queue.bind(chan, @queue, @exchange, routing_key: @routing_key)
 
     {:noreply, %{ conn: conn, chan: chan }}
+  end
+
+  def handle_info({:basic_return, payload, _property}, state) do
+    {:ok, payload} = JSON.decode(payload)
+    IO.puts("Payload: #{inspect(payload)}")
+    {:noreply, state}
   end
 
   defp get_publish_options() do
@@ -57,6 +69,7 @@ defmodule Producer do
       content_type: @content_type,
       expiration: @one_hour,
       persistant: false,
+      mandatory: true,
       app_id: @app_id
     ]
   end
