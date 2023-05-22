@@ -37,6 +37,7 @@ defmodule Producer do
 
   @impl GenServer
   def handle_cast({:publish, routing_key, msg}, %{ conn: conn, chan: chan }) do
+
     options = get_publish_options()
     AMQP.Basic.publish(chan, @exchange, routing_key, msg, options)
     {:noreply, %{ conn: conn, chan: chan }}
@@ -46,7 +47,15 @@ defmodule Producer do
   def handle_info(:init, _state) do
     {:ok, conn} = AMQP.Connection.open()
     {:ok, chan} = AMQP.Channel.open(conn)
-    AMQP.Basic.return(chan, self())
+
+    # This appoints the current server as
+    # The handler for all unrouted messages.
+    :ok = AMQP.Basic.return(chan, self())
+
+    # Allows this server to handle all
+    # `Confirm.SelectOk` messages
+    :ok = AMQP.Confirm.select(chan)
+    :ok = AMQP.Confirm.register_handler(chan, self())
 
     AMQP.Queue.declare(chan, @queue)
     AMQP.Exchange.declare(chan, @exchange)
@@ -61,10 +70,14 @@ defmodule Producer do
     {:noreply, state}
   end
 
+  def handle_info(info, state) do
+    IO.puts("Info: #{inspect(info)}")
+    {:noreply, state}
+  end
+
   defp get_publish_options() do
     [
-      headers: [{"position", :binary, "manager"},
-                {"company", :binary, "Eagle_Tech"}],
+      headers: [{"company", :binary, "Eagle_Tech"}],
       timestamp: get_timestamp(),
       content_type: @content_type,
       expiration: @one_hour,
