@@ -9,9 +9,15 @@ defmodule Producer do
   @exchange "test_exchange"
   @queue "test_queue"
 
+  # APIs
   @spec start_link() :: {:ok, pid()}
   def start_link() do
     GenServer.start_link(__MODULE__, nil, name: __MODULE__)
+  end
+
+  @spec stop() :: no_return()
+  def stop() do
+    GenServer.stop(__MODULE__, :normal)
   end
 
   @spec publish_msg(%{}) :: no_return()
@@ -61,5 +67,10 @@ defmodule Producer do
   def terminate(_reason, state) do
     AMQP.Queue.unbind(state.chan, state.queue, state.exchange)
     AMQP.Queue.delete(state.chan, state.queue)
+
+    AMQP.Exchange.delete(state.chan, state.exchange)
+
+    AMQP.Channel.close(state.chan)
+    AMQP.Connection.close(state.conn)
   end
 end
