@@ -22,7 +22,7 @@ defmodule Producer.MixProject do
   defp deps do
     [
       {:amqp, "~> 3.2"},
-      {:json, "~> 1.4"}
+      {:jsx, "~> 3.1"}
     ]
   end
 end
