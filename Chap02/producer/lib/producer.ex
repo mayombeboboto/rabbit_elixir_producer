@@ -25,6 +25,7 @@ defmodule Producer do
     GenServer.cast(__MODULE__, {:publish, JSX.encode(msg)})
   end
 
+  # Callback Functions
   @impl GenServer
   def init(nil) do
     Process.flag(:trap_exit, true)

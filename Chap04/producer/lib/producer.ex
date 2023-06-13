@@ -40,7 +40,7 @@ defmodule Producer do
     AMQP.Basic.publish(
       state.chan,
       state.exchange,
-      "unknown route",
+      @routing_key,
       msg,
       opts
     )
@@ -60,6 +60,12 @@ defmodule Producer do
     # This appoints the current server as
     # The handler for all unrouted messages.
     :ok = AMQP.Basic.return(chan, self())
+
+    # Grants this process the power to handle confirms
+    # Messages.
+    AMQP.Confirm.register_handler(chan, self())
+    # Activates publishing confirmations
+    AMQP.Confirm.select(chan)
 
     {:noreply,
      %{
@@ -97,7 +103,7 @@ defmodule Producer do
   # Internal Functions
   defp get_publish_options() do
     [
-      # mandatory causes a `basic.return` msg
+      # mandatory triggers a `basic.return` msg
       # In case the message cannot be routed.
       mandatory: true,
       app_id: "elixir push",
