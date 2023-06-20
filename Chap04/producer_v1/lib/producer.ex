@@ -7,6 +7,7 @@ defmodule Producer do
   alias :jsx, as: JSX
   @routing_key "test_routing_key"
   @exchange "test_exchange"
+  @exchange1 "test_exchange1"
   @queue "test_queue"
 
   # APIs
